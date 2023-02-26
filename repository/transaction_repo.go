@@ -21,6 +21,7 @@ type transactionRepository struct {
 func (r *transactionRepository) AddBalance(userId string, amount int) error {
 	var err error
 
+	//rolback jika ada kesalahan
 	err = r.runTransaction(func(tx *sqlx.Tx) error {
 		if err = r.checkUserExists(tx, userId); err != nil {
 			return fmt.Errorf("failed to add balance: %v", err)
@@ -44,6 +45,7 @@ func (r *transactionRepository) AddBalance(userId string, amount int) error {
 func (r *transactionRepository) SendBalance(userId string, amount int) error {
 	var err error
 
+	//rolback jika ada kesalahan
 	err = r.runTransaction(func(tx *sqlx.Tx) error {
 		if err = r.checkUserExists(tx, userId); err != nil {
 			return fmt.Errorf("failed to send balance: %v", err)
@@ -115,104 +117,3 @@ func NewTransactionRepository(dbArg *sqlx.DB) TransactionRepository {
 		db: dbArg,
 	}
 }
-
-// func (r *transactionRepository) AddBalance(userId string, amount int) error {
-// 	tx, err := r.db.Beginx()
-// 	if err != nil {
-// 		return fmt.Errorf("failed to start transaction: %v", err)
-// 	}
-
-// 	defer func() {
-// 		if err != nil {
-// 			tx.Rollback()
-// 			return
-// 		}
-// 		err = tx.Commit()
-// 	}()
-
-// 	// check if user exists
-// 	var user []model.User
-// 	err = tx.Select(&user, utils.USER_BY_ID, userId)
-
-// 	if err != nil {
-// 		return fmt.Errorf("failed to add balance: %v", err)
-// 	}
-
-// 	// add balance to user's account
-// 	balance := model.Balances{
-// 		UserId:  userId,
-// 		Balance: amount,
-// 	}
-
-// 	_, err = tx.NamedExec(utils.ADD_BALANCE, &balance)
-
-// 	fmt.Println(err)
-
-// 	if err != nil {
-// 		return fmt.Errorf("failed to add balance: %v", err)
-// 	}
-
-// 	return nil
-// }
-
-// func (r *transactionRepository) SendBalance(userId string, amount int) error {
-
-// 	tx, err := r.db.Beginx()
-// 	if err != nil {
-// 		return fmt.Errorf("failed to start transaction: %v", err)
-// 	}
-
-// 	defer func() {
-// 		if err != nil {
-// 			tx.Rollback()
-// 			return
-// 		}
-// 		err = tx.Commit()
-// 	}()
-
-// 	// check if user exists
-// 	var user []model.User
-// 	err = tx.Select(&user, utils.USER_BY_ID, userId)
-
-// 	if err != nil {
-// 		return fmt.Errorf("failed to add balance: %v", err)
-// 	}
-
-// 	// add balance to user's account
-// 	balance := model.Balances{
-// 		UserId:  userId,
-// 		Balance: amount,
-// 	}
-
-// 	_, err = tx.NamedExec(utils.SEND_BALANCE, &balance)
-
-// 	fmt.Println(err)
-
-// 	if err != nil {
-// 		return fmt.Errorf("failed to add balance: %v", err)
-// 	}
-
-// 	return nil
-// }
-
-// func (r *transactionRepository) GetBalance(userId string) ([]int, error) {
-// 	var balances []model.Balances
-// 	var balanceInt []int
-
-// 	err := r.db.Select(&balances, utils.CHECK_BALANCE_BY_ID, userId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	for _, v := range balances {
-// 		balanceInt = append(balanceInt, v.Balance)
-// 	}
-
-// 	return balanceInt, nil
-// }
-
-//	func NewTransactionRepository(dbArg *sqlx.DB) TransactionRepository {
-//		return &transactionRepository{
-//			db: dbArg,
-//		}
-//	}

@@ -17,8 +17,7 @@ type transactionUseCase struct {
 }
 
 func (tx *transactionUseCase) AddWallet(userId string, addBalance int) (int, error) {
-	// _, err := tx.userRepo.GetUserById(userId)
-	// fmt.Println(tx.userRepo.GetUserById(userId))
+
 	checkId, err := tx.userRepo.GetUserById(userId)
 
 	fmt.Println(checkId)

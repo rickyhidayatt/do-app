@@ -11,7 +11,9 @@ func main() {
 	config := config.NewConfig()
 	db := config.DbConnect()
 
-	// userRepo := repository.NewUserRepository(db)
+	userRepo := repository.NewUserRepository(db)
+
+	fmt.Println(userRepo.GetUserById("53-331-6070"))
 	// txUsecase := usecase.NewTransactionUseCase(txRepo, userRepo)
 
 	txRepo := repository.NewTransactionRepository(db)
@@ -22,6 +24,6 @@ func main() {
 	if err != nil {
 		fmt.Println("gagal")
 	}
-	fmt.Println("berhasi;")
+	fmt.Println("berhasil")
 
 }
