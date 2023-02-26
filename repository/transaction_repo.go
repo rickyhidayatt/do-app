@@ -1,29 +1,115 @@
 package repository
 
 import (
+	"fmt"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/rickyhidayatt/do-app/model"
 )
 
 type TransactionRepository interface {
-	AddBalance(addBallance int, registeredCustomers *model.User) error
+	AddBalance(userId string, amount int) error
+	GetBalance(userId string) ([]int, error)
+	SendBalance(userId string, amount int) error
 }
 
 type transactionRepository struct {
 	db *sqlx.DB
 }
 
-func (tx *transactionRepository) AddBalance(addBallance int, registeredCustomers *model.User) error {
-	balance := &model.Balance{
-		UserId:  registeredCustomers.Id,
-		Balance: addBallance,
-	}
-	_, err := tx.db.NamedExec("INSERT INTO balance (user_id, balance) VALUES (:user_id, :balance)", &balance)
+func (r *transactionRepository) AddBalance(userId string, amount int) error {
+	tx, err := r.db.Beginx()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start transaction: %v", err)
 	}
-	return nil
 
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
+
+	// check if user exists
+	var user []model.User
+	err = tx.Select(&user, "SELECT * FROM users WHERE id=$1", userId)
+
+	if err != nil {
+		return fmt.Errorf("failed to add balance: %v", err)
+	}
+
+	// add balance to user's account
+	balance := model.Balances{
+		UserId:  userId,
+		Balance: amount,
+	}
+
+	_, err = tx.NamedExec("UPDATE balances SET balance = balance + :balance WHERE user_id = :user_id", &balance)
+
+	fmt.Println(err)
+
+	if err != nil {
+		return fmt.Errorf("failed to add balance: %v", err)
+	}
+
+	return nil
+}
+
+func (r *transactionRepository) SendBalance(userId string, amount int) error {
+
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %v", err)
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
+
+	// check if user exists
+	var user []model.User
+	err = tx.Select(&user, "SELECT * FROM users WHERE id=$1", userId)
+
+	if err != nil {
+		return fmt.Errorf("failed to add balance: %v", err)
+	}
+
+	// add balance to user's account
+	balance := model.Balances{
+		UserId:  userId,
+		Balance: amount,
+	}
+
+	_, err = tx.NamedExec("UPDATE balances SET balance = balance - :balance WHERE user_id = :user_id", &balance)
+
+	fmt.Println(err)
+
+	if err != nil {
+		return fmt.Errorf("failed to add balance: %v", err)
+	}
+
+	return nil
+}
+
+func (r *transactionRepository) GetBalance(userId string) ([]int, error) {
+	var balances []model.Balances
+	var balanceInt []int
+
+	err := r.db.Select(&balances, "SELECT * FROM balances WHERE user_id = $1", userId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, v := range balances {
+		balanceInt = append(balanceInt, v.Balance)
+	}
+
+	return balanceInt, nil
 }
 
 func NewTransactionRepository(dbArg *sqlx.DB) TransactionRepository {
@@ -31,53 +117,3 @@ func NewTransactionRepository(dbArg *sqlx.DB) TransactionRepository {
 		db: dbArg,
 	}
 }
-
-/*
-
-kondisi ketika user udah create acount
-syarat penggunaan aplikasi
-
-1. Buka dompet dulu buat ngisi balance
-Jika user ingin membuaka dompet digital wajib top up
-so, user add balance > 10.000 user punya dompet digital dan bisa menggunakan fitur
-
-
-
-2. Transaksi hela supaya dapet riwayat karena transaksi mencakup semua query di Db
-kalo kita transaksi otomatis kita harus buat
-
-flownya :
-
-minimal transaksi di atas 10.000 if true
-insert di tabel transaction
-if true transaksi (amount) di atas 10.000 true
-
-Insert to receiver
-if acount number dan bank_name dan name == 0 maka false if true
-
-insert transaction_category
-if category_name / nama transaksi (tidak menyebutkan transaksi buat apa) maka false if ngisi maka true
-
-Update tabel Balances
-sesuai user.id
-
-
-
-Menampilkan Saldo User
-
-sqlx
-
-3.
-
-
-
-
-
-
-
-
-
-// bikin query
-
-
-*/

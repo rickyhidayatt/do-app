@@ -31,8 +31,6 @@ func (c *Config) initDb() {
 	db, err := sqlx.Open(dbDriver, connectDB)
 	// defer db.Close()
 
-	fmt.Println("Berhasil konnek")
-
 	if err != nil {
 		fmt.Println(err.Error())
 	}
@@ -40,6 +38,8 @@ func (c *Config) initDb() {
 	if err := db.Ping(); err != nil {
 		fmt.Println(err.Error())
 	}
+
+	fmt.Println("Berhasil konnek")
 
 	c.Db = db
 
