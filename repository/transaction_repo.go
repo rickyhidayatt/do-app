@@ -5,6 +5,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/rickyhidayatt/do-app/model"
+	"github.com/rickyhidayatt/do-app/utils"
 )
 
 type TransactionRepository interface {
@@ -18,89 +19,57 @@ type transactionRepository struct {
 }
 
 func (r *transactionRepository) AddBalance(userId string, amount int) error {
-	tx, err := r.db.Beginx()
-	if err != nil {
-		return fmt.Errorf("failed to start transaction: %v", err)
-	}
+	var err error
 
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-			return
+	err = r.runTransaction(func(tx *sqlx.Tx) error {
+		if err = r.checkUserExists(tx, userId); err != nil {
+			return fmt.Errorf("failed to add balance: %v", err)
 		}
-		err = tx.Commit()
-	}()
 
-	// check if user exists
-	var user []model.User
-	err = tx.Select(&user, "SELECT * FROM users WHERE id=$1", userId)
+		balance := model.Balances{
+			UserId:  userId,
+			Balance: amount,
+		}
 
-	if err != nil {
-		return fmt.Errorf("failed to add balance: %v", err)
-	}
+		if _, err = tx.NamedExec(utils.ADD_BALANCE, &balance); err != nil {
+			return fmt.Errorf("failed to add balance: %v", err)
+		}
 
-	// add balance to user's account
-	balance := model.Balances{
-		UserId:  userId,
-		Balance: amount,
-	}
+		return nil
+	})
 
-	_, err = tx.NamedExec("UPDATE balances SET balance = balance + :balance WHERE user_id = :user_id", &balance)
-
-	fmt.Println(err)
-
-	if err != nil {
-		return fmt.Errorf("failed to add balance: %v", err)
-	}
-
-	return nil
+	return err
 }
 
 func (r *transactionRepository) SendBalance(userId string, amount int) error {
+	var err error
 
-	tx, err := r.db.Beginx()
-	if err != nil {
-		return fmt.Errorf("failed to start transaction: %v", err)
-	}
-
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-			return
+	err = r.runTransaction(func(tx *sqlx.Tx) error {
+		if err = r.checkUserExists(tx, userId); err != nil {
+			return fmt.Errorf("failed to send balance: %v", err)
 		}
-		err = tx.Commit()
-	}()
 
-	// check if user exists
-	var user []model.User
-	err = tx.Select(&user, "SELECT * FROM users WHERE id=$1", userId)
+		balance := model.Balances{
+			UserId:  userId,
+			Balance: amount,
+		}
 
-	if err != nil {
-		return fmt.Errorf("failed to add balance: %v", err)
-	}
+		if _, err = tx.NamedExec(utils.SEND_BALANCE, &balance); err != nil {
+			return fmt.Errorf("failed to send balance: %v", err)
+		}
 
-	// add balance to user's account
-	balance := model.Balances{
-		UserId:  userId,
-		Balance: amount,
-	}
+		return nil
+	})
 
-	_, err = tx.NamedExec("UPDATE balances SET balance = balance - :balance WHERE user_id = :user_id", &balance)
-
-	fmt.Println(err)
-
-	if err != nil {
-		return fmt.Errorf("failed to add balance: %v", err)
-	}
-
-	return nil
+	return err
 }
 
 func (r *transactionRepository) GetBalance(userId string) ([]int, error) {
 	var balances []model.Balances
 	var balanceInt []int
+	var err error
 
-	err := r.db.Select(&balances, "SELECT * FROM balances WHERE user_id = $1", userId)
+	err = r.db.Select(&balances, utils.CHECK_BALANCE_BY_ID, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -112,8 +81,138 @@ func (r *transactionRepository) GetBalance(userId string) ([]int, error) {
 	return balanceInt, nil
 }
 
+func (r *transactionRepository) checkUserExists(tx *sqlx.Tx, userId string) error {
+	var user []model.User
+	if err := tx.Select(&user, utils.USER_BY_ID, userId); err != nil {
+		return err
+	}
+
+	if len(user) == 0 {
+		return fmt.Errorf("user %s not found", userId)
+	}
+
+	return nil
+}
+
+func (r *transactionRepository) runTransaction(f func(*sqlx.Tx) error) error {
+	tx, err := r.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %v", err)
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+			return
+		}
+		err = tx.Commit()
+	}()
+
+	return f(tx)
+}
+
 func NewTransactionRepository(dbArg *sqlx.DB) TransactionRepository {
 	return &transactionRepository{
 		db: dbArg,
 	}
 }
+
+// func (r *transactionRepository) AddBalance(userId string, amount int) error {
+// 	tx, err := r.db.Beginx()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to start transaction: %v", err)
+// 	}
+
+// 	defer func() {
+// 		if err != nil {
+// 			tx.Rollback()
+// 			return
+// 		}
+// 		err = tx.Commit()
+// 	}()
+
+// 	// check if user exists
+// 	var user []model.User
+// 	err = tx.Select(&user, utils.USER_BY_ID, userId)
+
+// 	if err != nil {
+// 		return fmt.Errorf("failed to add balance: %v", err)
+// 	}
+
+// 	// add balance to user's account
+// 	balance := model.Balances{
+// 		UserId:  userId,
+// 		Balance: amount,
+// 	}
+
+// 	_, err = tx.NamedExec(utils.ADD_BALANCE, &balance)
+
+// 	fmt.Println(err)
+
+// 	if err != nil {
+// 		return fmt.Errorf("failed to add balance: %v", err)
+// 	}
+
+// 	return nil
+// }
+
+// func (r *transactionRepository) SendBalance(userId string, amount int) error {
+
+// 	tx, err := r.db.Beginx()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to start transaction: %v", err)
+// 	}
+
+// 	defer func() {
+// 		if err != nil {
+// 			tx.Rollback()
+// 			return
+// 		}
+// 		err = tx.Commit()
+// 	}()
+
+// 	// check if user exists
+// 	var user []model.User
+// 	err = tx.Select(&user, utils.USER_BY_ID, userId)
+
+// 	if err != nil {
+// 		return fmt.Errorf("failed to add balance: %v", err)
+// 	}
+
+// 	// add balance to user's account
+// 	balance := model.Balances{
+// 		UserId:  userId,
+// 		Balance: amount,
+// 	}
+
+// 	_, err = tx.NamedExec(utils.SEND_BALANCE, &balance)
+
+// 	fmt.Println(err)
+
+// 	if err != nil {
+// 		return fmt.Errorf("failed to add balance: %v", err)
+// 	}
+
+// 	return nil
+// }
+
+// func (r *transactionRepository) GetBalance(userId string) ([]int, error) {
+// 	var balances []model.Balances
+// 	var balanceInt []int
+
+// 	err := r.db.Select(&balances, utils.CHECK_BALANCE_BY_ID, userId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	for _, v := range balances {
+// 		balanceInt = append(balanceInt, v.Balance)
+// 	}
+
+// 	return balanceInt, nil
+// }
+
+//	func NewTransactionRepository(dbArg *sqlx.DB) TransactionRepository {
+//		return &transactionRepository{
+//			db: dbArg,
+//		}
+//	}
